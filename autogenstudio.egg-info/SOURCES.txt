@@ -1,3 +1,4 @@
+.DS_Store
 .gitignore
 Dockerfile
 LICENSE-CODE
@@ -6,6 +7,7 @@ README.md
 pyproject.toml
 requirements.txt
 setup.py
+uv.lock
 autogenstudio/__init__.py
 autogenstudio/cli.py
 autogenstudio/version.py

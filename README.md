@@ -185,3 +185,7 @@ Please refer to the AutoGen Studio [FAQs](https://microsoft.github.io/autogen/do
 ## Acknowledgements
 
 AutoGen Studio is Based on the [AutoGen](https://microsoft.github.io/autogen) project. It was adapted from a research prototype built in October 2023 (original credits: Gagan Bansal, Adam Fourney, Victor Dibia, Piali Choudhury, Saleema Amershi, Ahmed Awadallah, Chi Wang).
+
+
+ uvicorn autogenstudio.web.app:app --host 0.0.0.0 --port 8081 --reload
+ 
