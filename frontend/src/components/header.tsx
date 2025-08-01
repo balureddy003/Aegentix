@@ -31,6 +31,7 @@ const Header = ({ meta, link }: any) => {
   const userName = user ? user.name : "Unknown";
   const userAvatarUrl = user ? sanitizeUrl(user.avatar_url) : "";
   const user_id = user ? user.id : "unknown";
+  const tenant_id = user?.metadata?.tenant_id;
 
   const links: any[] = [
     { name: "Build", href: "/build" },
@@ -146,6 +147,9 @@ const Header = ({ meta, link }: any) => {
                       <div className="ml-3">
                         <div className="text-sm text-primary">{userName}</div>
                         <div className="text-xs  text-secondary">{user_id}</div>
+                        {tenant_id && (
+                          <div className="text-xs text-secondary">Tenant: {tenant_id}</div>
+                        )}
                       </div>
 
                       {/* Profile dropdown */}
@@ -254,6 +258,9 @@ const Header = ({ meta, link }: any) => {
                   <div className="ml-3">
                     <div className="text-sm text-primary">{userName}</div>
                     <div className="text-xs   text-secondary">{user_id}</div>
+                    {tenant_id && (
+                      <div className="text-xs text-secondary">Tenant: {tenant_id}</div>
+                    )}
                   </div>
                   <button
                     type="button"
