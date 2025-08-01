@@ -1,16 +1,15 @@
 # api/deps.py
-import json
 import logging
 import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 
 from ..database import DatabaseManager
 from ..teammanager import TeamManager
-from .auth import AuthConfig, AuthManager, AuthMiddleware
+from .auth import AuthConfig, AuthManager
 from .auth.dependencies import get_auth_manager
 from .config import settings
 from .managers.connection import WebSocketManager
@@ -37,14 +36,16 @@ def get_db_context():
     """Provide a transactional scope around a series of operations."""
     if not _db_manager:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database manager not initialized"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database manager not initialized",
         )
     try:
         yield _db_manager
     except Exception as e:
         logger.error(f"Database operation failed: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database operation failed"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database operation failed",
         ) from e
 
 
@@ -52,7 +53,8 @@ async def get_db() -> DatabaseManager:
     """Dependency provider for database manager"""
     if not _db_manager:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database manager not initialized"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database manager not initialized",
         )
     return _db_manager
 
@@ -61,7 +63,8 @@ async def get_websocket_manager() -> WebSocketManager:
     """Dependency provider for connection manager"""
     if not _websocket_manager:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Connection manager not initialized"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Connection manager not initialized",
         )
     return _websocket_manager
 
@@ -69,7 +72,10 @@ async def get_websocket_manager() -> WebSocketManager:
 async def get_team_manager() -> TeamManager:
     """Dependency provider for team manager"""
     if not _team_manager:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Team manager not initialized")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Team manager not initialized",
+        )
     return _team_manager
 
 
@@ -86,7 +92,25 @@ async def get_current_user(request: Request) -> str:
     if auth_manager.config.type == "none":
         return settings.DEFAULT_USER_ID
 
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
+    )
+
+
+async def get_current_tenant_id(request: Request) -> int:
+    if hasattr(request.state, "user"):
+        metadata = getattr(request.state.user, "metadata", {})
+        if isinstance(metadata, dict) and metadata.get("tenant_id"):
+            return int(metadata["tenant_id"])
+    return 1
+
+
+async def get_current_domain_id(request: Request) -> int:
+    if hasattr(request.state, "user"):
+        metadata = getattr(request.state.user, "metadata", {})
+        if isinstance(metadata, dict) and metadata.get("domain_id"):
+            return int(metadata["domain_id"])
+    return 1
 
 
 def init_auth_manager(config_dir: Path) -> AuthManager:
@@ -103,10 +127,14 @@ def init_auth_manager(config_dir: Path) -> AuthManager:
     if auth_config_path and os.path.exists(auth_config_path):
         try:
             auth_manager = AuthManager.from_yaml(auth_config_path)
-            logger.info(f"Authentication initialized with provider: {auth_manager.config.type}")
+            logger.info(
+                f"Authentication initialized with provider: {auth_manager.config.type}"
+            )
             return auth_manager
         except Exception as e:
-            logger.error(f"Failed to initialize authentication from config file: {str(e)}")
+            logger.error(
+                f"Failed to initialize authentication from config file: {str(e)}"
+            )
             logger.warning("Falling back to no authentication")
 
     # Default or fallback
@@ -131,7 +159,9 @@ async def register_auth_dependencies(app: FastAPI, auth_manager: AuthManager) ->
 # Manager initialization and cleanup
 
 
-async def init_managers(database_uri: str, config_dir: str | Path, app_root: str | Path) -> None:
+async def init_managers(
+    database_uri: str, config_dir: str | Path, app_root: str | Path
+) -> None:
     """Initialize all manager instances"""
     global _db_manager, _websocket_manager, _team_manager
 
@@ -146,15 +176,36 @@ async def init_managers(database_uri: str, config_dir: str | Path, app_root: str
             logger.info("Initializing database for lite mode...")
             # Use the database manager's initialization but skip migrations
             # since lite mode uses in-memory database that doesn't need persistence
-            _db_manager.initialize_database(auto_upgrade=False, force_init_alembic=False)
+            _db_manager.initialize_database(
+                auto_upgrade=False, force_init_alembic=False
+            )
         else:
             # Full initialization with migrations for regular mode
             _db_manager.initialize_database(auto_upgrade=settings.UPGRADE_DATABASE)
 
+        from ..datamodel import Domain, Tenant
+
+        # Ensure default tenant and domain exist
+        default_tenant = _db_manager.get(Tenant, {"slug": "default"})
+        if not default_tenant.status or not default_tenant.data:
+            tenant = Tenant(name="Default Tenant", slug="default", config={})
+            _db_manager.upsert(tenant)
+            tenant_id = tenant.id
+        else:
+            tenant_id = default_tenant.data[0].id
+
+        default_domain = _db_manager.get(
+            Domain, {"name": "default", "tenant_id": tenant_id}
+        )
+        if not default_domain.status or not default_domain.data:
+            _db_manager.upsert(Domain(name="default", tenant_id=tenant_id))
+
         # Skip default team import for lite mode (we'll load our specific team)
         if not is_lite_mode():
             # init default team config
-            await _db_manager.import_teams_from_directory(config_dir, settings.DEFAULT_USER_ID, check_exists=True)
+            await _db_manager.import_teams_from_directory(
+                config_dir, settings.DEFAULT_USER_ID, check_exists=True
+            )
 
         # Initialize lite mode if enabled
         await init_lite_mode(_db_manager)
@@ -223,7 +274,11 @@ def get_manager_status() -> dict:
 
 async def get_managers():
     """Get all managers in one dependency"""
-    return {"db": await get_db(), "connection": await get_websocket_manager(), "team": await get_team_manager()}
+    return {
+        "db": await get_db(),
+        "connection": await get_websocket_manager(),
+        "team": await get_team_manager(),
+    }
 
 
 # Error handling for manager operations
@@ -247,7 +302,9 @@ def require_managers(*manager_names: str):
 
     async def dependency():
         manager_status = get_manager_status()  # Different name
-        missing = [name for name in manager_names if not manager_status.get(f"{name}_manager")]
+        missing = [
+            name for name in manager_names if not manager_status.get(f"{name}_manager")
+        ]
         if missing:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,  # Now this refers to the imported module
@@ -269,31 +326,43 @@ async def init_lite_mode(db_manager: DatabaseManager) -> None:
     if settings.LITE_TEAM_FILE and os.path.exists(settings.LITE_TEAM_FILE):
         try:
             # Import the team into the database
-            result = await db_manager.import_team(settings.LITE_TEAM_FILE, settings.DEFAULT_USER_ID, check_exists=True)
+            result = await db_manager.import_team(
+                settings.LITE_TEAM_FILE, settings.DEFAULT_USER_ID, check_exists=True
+            )
             if result.status and result.data:
                 team_id = result.data.get("id")
-                logger.info(f"Loaded team from file {settings.LITE_TEAM_FILE} with ID: {team_id}")
+                logger.info(
+                    f"Loaded team from file {settings.LITE_TEAM_FILE} with ID: {team_id}"
+                )
 
                 # Create a default session with this team
                 from ..datamodel.db import Session
 
                 session_name = settings.LITE_SESSION_NAME or "Lite Mode Session"
 
-                session = Session(user_id=settings.DEFAULT_USER_ID, team_id=team_id, name=session_name)
+                session = Session(
+                    user_id=settings.DEFAULT_USER_ID, team_id=team_id, name=session_name
+                )
 
                 session_result = db_manager.upsert(session)
                 if session_result.status and session_result.data:
                     session_id = session_result.data.get("id")
-                    logger.info(f"Created lite mode session: {session_name} (ID: {session_id})")
+                    logger.info(
+                        f"Created lite mode session: {session_name} (ID: {session_id})"
+                    )
                 else:
                     logger.error(f"Failed to create session: {session_result.message}")
-                    raise Exception(f"Failed to create session: {session_result.message}")
+                    raise Exception(
+                        f"Failed to create session: {session_result.message}"
+                    )
             else:
                 logger.error(f"Failed to import team from file: {result.message}")
                 raise Exception(f"Failed to import team: {result.message}")
 
         except Exception as e:
-            logger.error(f"Failed to load team from file {settings.LITE_TEAM_FILE}: {str(e)}")
+            logger.error(
+                f"Failed to load team from file {settings.LITE_TEAM_FILE}: {str(e)}"
+            )
             raise
     else:
         logger.error("No team file specified for lite mode")
