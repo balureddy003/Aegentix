@@ -47,14 +47,9 @@ class BaseDBModel(SQLModel, table=False):
     user_id: Optional[str] = None
     version: Optional[str] = "0.0.1"
 
-    tenant_id: Optional[int] = Field(
-        default=None,
-        sa_column=Column(Integer, ForeignKey("tenant.id", ondelete="CASCADE")),
-    )
-    domain_id: Optional[int] = Field(
-        default=None,
-        sa_column=Column(Integer, ForeignKey("domain.id", ondelete="SET NULL")),
-    )
+    tenant_id: Optional[int] = Field(default=None, foreign_key="tenant.id")
+    domain_id: Optional[int] = Field(default=None, foreign_key="domain.id")
+
 
 
 class Tenant(SQLModel, table=True):

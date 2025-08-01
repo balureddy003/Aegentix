@@ -46,7 +46,7 @@ class GalleryBuilder:
 
         # Default metadata
         self.metadata = GalleryMetadata(
-            author="AutoGen Team",
+            author="Aegentix",
             version="1.0.0",
             description="",
             tags=[],

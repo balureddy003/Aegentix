@@ -27,7 +27,7 @@ def test_db(tmp_path) -> Generator[DatabaseManager, None, None]:
     db = DatabaseManager(f"sqlite:///{db_path}", base_dir=tmp_path)
     db.reset_db()
     # Initialize database instead of create_db_and_tables
-    db.initialize_database(auto_upgrade=False)
+    db.initialize_database(auto_upgrade=True)
     yield db
     # Clean up
     asyncio.run(db.close())
