@@ -418,6 +418,19 @@ export interface DBModel {
   created_at?: string;
   updated_at?: string;
   version?: number;
+  tenant_id?: number;
+  domain_id?: number;
+}
+
+export interface Tenant extends DBModel {
+  name: string;
+  slug: string;
+  config?: Record<string, any>;
+}
+
+export interface Domain extends DBModel {
+  name: string;
+  tenant_id: number;
 }
 
 export interface Message extends DBModel {

@@ -1,4 +1,15 @@
-from .db import BaseDBModel, Gallery, Message, Run, RunStatus, Session, Settings, Team
+from .db import (
+    BaseDBModel,
+    Domain,
+    Gallery,
+    Message,
+    Run,
+    RunStatus,
+    Session,
+    Settings,
+    Team,
+    Tenant,
+)
 from .types import (
     EnvironmentVariable,
     GalleryComponents,
@@ -14,6 +25,7 @@ from .types import (
 )
 
 __all__ = [
+    "BaseDBModel",
     "Team",
     "Run",
     "RunStatus",
@@ -33,4 +45,6 @@ __all__ = [
     "Settings",
     "EnvironmentVariable",
     "Gallery",
+    "Tenant",
+    "Domain",
 ]

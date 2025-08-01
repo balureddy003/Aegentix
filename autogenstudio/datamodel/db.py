@@ -47,6 +47,41 @@ class BaseDBModel(SQLModel, table=False):
     user_id: Optional[str] = None
     version: Optional[str] = "0.0.1"
 
+    tenant_id: Optional[int] = Field(default=None, foreign_key="tenant.id")
+    domain_id: Optional[int] = Field(default=None, foreign_key="domain.id")
+
+
+
+class Tenant(SQLModel, table=True):
+    __table_args__ = {"sqlite_autoincrement": True}
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    slug: str
+    config: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
+    created_at: datetime = Field(
+        default_factory=datetime.now,
+        sa_type=DateTime(timezone=True),
+        sa_column_kwargs={"server_default": func.now(), "nullable": True},
+    )
+
+
+class Domain(SQLModel, table=True):
+    __table_args__ = {"sqlite_autoincrement": True}
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    tenant_id: int = Field(
+        sa_column=Column(
+            Integer, ForeignKey("tenant.id", ondelete="CASCADE"), nullable=False
+        )
+    )
+    created_at: datetime = Field(
+        default_factory=datetime.now,
+        sa_type=DateTime(timezone=True),
+        sa_column_kwargs={"server_default": func.now(), "nullable": True},
+    )
+
 
 class Team(BaseDBModel, table=True):
     __table_args__ = {"sqlite_autoincrement": True}
@@ -57,19 +92,29 @@ class Message(BaseDBModel, table=True):
     __table_args__ = {"sqlite_autoincrement": True}
 
     config: Union[MessageConfig, dict] = Field(
-        default_factory=lambda: MessageConfig(source="", content=""), sa_column=Column(JSON)
+        default_factory=lambda: MessageConfig(source="", content=""),
+        sa_column=Column(JSON),
     )
     session_id: Optional[int] = Field(
-        default=None, sa_column=Column(Integer, ForeignKey("session.id", ondelete="NO ACTION"))
+        default=None,
+        sa_column=Column(Integer, ForeignKey("session.id", ondelete="NO ACTION")),
     )
-    run_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("run.id", ondelete="CASCADE")))
+    run_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(Integer, ForeignKey("run.id", ondelete="CASCADE")),
+    )
 
-    message_meta: Optional[Union[MessageMeta, dict]] = Field(default={}, sa_column=Column(JSON))
+    message_meta: Optional[Union[MessageMeta, dict]] = Field(
+        default={}, sa_column=Column(JSON)
+    )
 
 
 class Session(BaseDBModel, table=True):
     __table_args__ = {"sqlite_autoincrement": True}
-    team_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("team.id", ondelete="CASCADE")))
+    team_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(Integer, ForeignKey("team.id", ondelete="CASCADE")),
+    )
     name: Optional[str] = None
 
     @field_validator("created_at", "updated_at", mode="before")
@@ -93,19 +138,26 @@ class Run(BaseDBModel, table=True):
 
     __table_args__ = {"sqlite_autoincrement": True}
 
-    session_id: int = Field(sa_column=Column(Integer, ForeignKey("session.id", ondelete="CASCADE"), nullable=False))
+    session_id: int = Field(
+        sa_column=Column(
+            Integer, ForeignKey("session.id", ondelete="CASCADE"), nullable=False
+        )
+    )
     status: RunStatus = Field(default=RunStatus.CREATED)
 
     # Store the original user task
     task: Union[MessageConfig, dict] = Field(
-        default_factory=lambda: MessageConfig(source="", content=""), sa_column=Column(JSON)
+        default_factory=lambda: MessageConfig(source="", content=""),
+        sa_column=Column(JSON),
     )
 
     # Store TeamResult which contains TaskResult
     team_result: Union[TeamResult, dict] = Field(default=None, sa_column=Column(JSON))
 
     error_message: Optional[str] = None
-    messages: Union[List[Message], List[dict]] = Field(default_factory=list, sa_column=Column(JSON))
+    messages: Union[List[Message], List[dict]] = Field(
+        default_factory=list, sa_column=Column(JSON)
+    )
 
     model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})  # type: ignore[call-arg]
 
@@ -118,7 +170,14 @@ class Gallery(BaseDBModel, table=True):
             id="",
             name="",
             metadata=GalleryMetadata(author="", version=""),
-            components=GalleryComponents(agents=[], models=[], tools=[], terminations=[], teams=[], workbenches=[]),
+            components=GalleryComponents(
+                agents=[],
+                models=[],
+                tools=[],
+                terminations=[],
+                teams=[],
+                workbenches=[],
+            ),
         ),
         sa_column=Column(JSON),
     )
@@ -134,7 +193,9 @@ class Gallery(BaseDBModel, table=True):
 class Settings(BaseDBModel, table=True):
     __table_args__ = {"sqlite_autoincrement": True}
 
-    config: Union[SettingsConfig, dict] = Field(default_factory=SettingsConfig, sa_column=Column(JSON))
+    config: Union[SettingsConfig, dict] = Field(
+        default_factory=SettingsConfig, sa_column=Column(JSON)
+    )
 
 
 # --- Evaluation system database models ---
@@ -170,7 +231,8 @@ class EvalRunDB(BaseDBModel, table=True):
 
     # References to related components
     task_id: Optional[int] = Field(
-        default=None, sa_column=Column(Integer, ForeignKey("evaltaskdb.id", ondelete="SET NULL"))
+        default=None,
+        sa_column=Column(Integer, ForeignKey("evaltaskdb.id", ondelete="SET NULL")),
     )
 
     # Serialized configurations for runner and judge
@@ -178,7 +240,9 @@ class EvalRunDB(BaseDBModel, table=True):
     judge_config: Union[ComponentModel, dict] = Field(sa_column=Column(JSON))
 
     # List of criteria IDs or embedded criteria configs
-    criteria_configs: List[Union[EvalJudgeCriteria, dict]] = Field(default_factory=list, sa_column=Column(JSON))
+    criteria_configs: List[Union[EvalJudgeCriteria, dict]] = Field(
+        default_factory=list, sa_column=Column(JSON)
+    )
 
     # Run status and timing information
     status: EvalRunStatus = Field(default=EvalRunStatus.PENDING)

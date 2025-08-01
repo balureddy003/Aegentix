@@ -5,9 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "autogenstudio"
 authors = [
-  { name="AutoGen Team", email="autogen@microsoft.com" },
+  { name="Aegentix", email="Aegentix@gmail.com" },
 ]
-description = "AutoGen Studio"
+description = "Aegentix"
 readme = "README.md"
 license = {file = "LICENSE-CODE"}
 classifiers = [

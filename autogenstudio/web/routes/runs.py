@@ -5,7 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ...datamodel import Message, Run, RunStatus, Session
-from ..deps import get_db
+from ..deps import (
+    get_current_domain_id,
+    get_current_tenant_id,
+    get_db,
+)
 
 router = APIRouter()
 
@@ -18,11 +22,20 @@ class CreateRunRequest(BaseModel):
 @router.post("/")
 async def create_run(
     request: CreateRunRequest,
+    tenant_id: int = Depends(get_current_tenant_id),
+    domain_id: int = Depends(get_current_domain_id),
     db=Depends(get_db),
 ) -> Dict:
     """Create a new run with initial state"""
     session_response = db.get(
-        Session, filters={"id": request.session_id, "user_id": request.user_id}, return_json=False
+        Session,
+        filters={
+            "id": request.session_id,
+            "user_id": request.user_id,
+            "tenant_id": tenant_id,
+            "domain_id": domain_id,
+        },
+        return_json=False,
     )
     if not session_response.status or not session_response.data:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -36,6 +49,8 @@ async def create_run(
                 user_id=request.user_id,
                 task={},  # Will be set when run starts
                 team_result={},
+                tenant_id=tenant_id,
+                domain_id=domain_id,
             ),
             return_json=False,
         )
@@ -48,9 +63,18 @@ async def create_run(
 
 
 @router.get("/{run_id}")
-async def get_run(run_id: int, db=Depends(get_db)) -> Dict:
+async def get_run(
+    run_id: int,
+    tenant_id: int = Depends(get_current_tenant_id),
+    domain_id: int = Depends(get_current_domain_id),
+    db=Depends(get_db),
+) -> Dict:
     """Get run details including task and result"""
-    run = db.get(Run, filters={"id": run_id}, return_json=False)
+    run = db.get(
+        Run,
+        filters={"id": run_id, "tenant_id": tenant_id, "domain_id": domain_id},
+        return_json=False,
+    )
     if not run.status or not run.data:
         raise HTTPException(status_code=404, detail="Run not found")
 
@@ -58,8 +82,18 @@ async def get_run(run_id: int, db=Depends(get_db)) -> Dict:
 
 
 @router.get("/{run_id}/messages")
-async def get_run_messages(run_id: int, db=Depends(get_db)) -> Dict:
+async def get_run_messages(
+    run_id: int,
+    tenant_id: int = Depends(get_current_tenant_id),
+    domain_id: int = Depends(get_current_domain_id),
+    db=Depends(get_db),
+) -> Dict:
     """Get all messages for a run"""
-    messages = db.get(Message, filters={"run_id": run_id}, order="created_at asc", return_json=False)
+    messages = db.get(
+        Message,
+        filters={"run_id": run_id, "tenant_id": tenant_id, "domain_id": domain_id},
+        order="created_at asc",
+        return_json=False,
+    )
 
     return {"status": True, "data": messages.data}

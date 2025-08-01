@@ -7,6 +7,7 @@ export interface User {
   avatar_url?: string;
   provider?: string;
   roles?: string[];
+  metadata?: Record<string, any>;
 }
 
 export class AuthAPI {
